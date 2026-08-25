@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tableau de travail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tangerine:wght@700&family=Cinzel:wght@500;600;700&family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#2c1e0f;
+    --emerald:#0f6b45;
+    --emerald-deep:#0a4a30;
+    --paper:#ddc4a0;
+    --panel:#f2e6ce;
+    --line:#b98d5e;
+    --accent:#0f6b45;
+    --accent-2:#7a4e24;
+    --muted:#7a6449;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 0%, rgba(15,107,69,0.08), transparent 60%),
+      radial-gradient(ellipse 70% 60% at 100% 100%, rgba(122,78,36,0.15), transparent 60%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Cormorant Garamond',serif;
+    min-height:100vh;
+  }
+  #logout-btn{
+    position:fixed;
+    top:20px;
+    right:20px;
+    font-family:'Cinzel',serif;
+    font-size:12px;
+    letter-spacing:0.04em;
+    background:transparent;
+    color:var(--accent-2);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:9px 14px;
+    cursor:pointer;
+  }
+  #logout-btn:hover{background:rgba(122,78,36,0.08);border-color:var(--accent-2);}
+</style>
+</head>
+<body>
+<!-- Contenu du tableau de travail à venir -->
+<button id="logout-btn">Se déconnecter</button>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDDZI33eQttXHo1CPSLzx_61AYuivVMB_o",
+    authDomain: "le-tableau-d-action.firebaseapp.com",
+    projectId: "le-tableau-d-action",
+    storageBucket: "le-tableau-d-action.firebasestorage.app",
+    messagingSenderId: "120615573034",
+    appId: "1:120615573034:web:7a26169618cf5a04659553"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  // Si personne n'est connecté, retour à la page de connexion.
+  onAuthStateChanged(auth, (user) => {
+    if (!user) {
+      window.location.href = 'index.html';
+    }
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await signOut(auth);
+    window.location.href = 'index.html';
+  });
+</script>
+</body>
+</html>
