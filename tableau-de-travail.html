@@ -248,6 +248,132 @@
     color:var(--muted);
     font-style:italic;
   }
+
+  /* ---------- Swatches de couleur (brillants) ---------- */
+  .color-swatch{
+    width:22px;
+    height:22px;
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,0.7);
+    cursor:pointer;
+    padding:0;
+    transition:transform .12s ease;
+  }
+  .color-swatch:hover{transform:scale(1.15);}
+  .color-swatch.selected{
+    outline:2px solid var(--ink);
+    outline-offset:2px;
+  }
+  .color-popover{
+    position:absolute;
+    top:100%;
+    right:8px;
+    z-index:30;
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    width:150px;
+    padding:10px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    box-shadow:0 8px 20px rgba(44,30,15,0.3);
+  }
+  .color-popover.hidden{display:none;}
+  .card-header{position:relative;}
+
+  /* ---------- Chat en temps réel ---------- */
+  #chat-toggle{
+    position:fixed;
+    bottom:26px;
+    right:26px;
+    width:54px;
+    height:54px;
+    border-radius:50%;
+    border:none;
+    background:linear-gradient(180deg,var(--emerald) 0%,var(--emerald-deep) 100%);
+    color:var(--panel);
+    font-size:22px;
+    cursor:pointer;
+    box-shadow:0 8px 20px rgba(44,30,15,0.35);
+    z-index:60;
+  }
+  #chat-toggle:hover{opacity:0.92;}
+  #chat-panel{
+    position:fixed;
+    bottom:92px;
+    right:26px;
+    width:320px;
+    max-height:480px;
+    display:flex;
+    flex-direction:column;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:8px;
+    box-shadow:0 12px 32px rgba(44,30,15,0.35);
+    z-index:60;
+    overflow:hidden;
+  }
+  #chat-panel.hidden{display:none;}
+  .chat-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:11px 14px;
+    background:linear-gradient(180deg,var(--emerald) 0%,var(--emerald-deep) 100%);
+    color:var(--panel);
+    font-family:'Cinzel',serif;
+    font-size:13px;
+    letter-spacing:0.03em;
+  }
+  #chat-messages{
+    flex:1;
+    overflow-y:auto;
+    padding:12px 14px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    background:rgba(255,255,255,0.35);
+    min-height:180px;
+    max-height:280px;
+  }
+  .chat-message{
+    font-size:15px;
+    line-height:1.5;
+    word-wrap:break-word;
+  }
+  .chat-username{
+    font-weight:700;
+    margin-right:6px;
+  }
+  .chat-text{color:var(--ink);}
+  .chat-color-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    padding:8px 14px;
+    border-top:1px solid var(--line);
+    background:rgba(255,255,255,0.2);
+  }
+  .chat-form{
+    display:flex;
+    gap:8px;
+    padding:10px 14px;
+    border-top:1px solid var(--line);
+  }
+  .chat-form input{
+    flex:1;
+    min-width:0;
+    padding:9px 10px;
+    border:1px solid var(--line);
+    border-radius:3px;
+    font-family:'Cormorant Garamond',serif;
+    font-size:15px;
+    background:rgba(255,255,255,0.6);
+    color:var(--ink);
+  }
+  .chat-form input:focus{outline:none;border-color:var(--emerald);}
+  .chat-form .btn{padding:9px 14px;font-size:12px;}
 </style>
 </head>
 <body>
@@ -282,9 +408,24 @@
   </div>
 </div>
 
+<button id="chat-toggle" title="Chat">💬</button>
+<div id="chat-panel" class="hidden">
+  <div class="chat-header">
+    <span>Chat en direct</span>
+    <button id="chat-close" class="icon-btn" title="Fermer">✕</button>
+  </div>
+  <div id="chat-messages"></div>
+  <div class="chat-color-row" id="chat-color-row"></div>
+  <form class="chat-form" id="chat-form">
+    <input type="text" id="chat-input" placeholder="Votre message…" autocomplete="off">
+    <button type="submit" class="btn btn-primary">Envoyer</button>
+  </form>
+</div>
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDDZI33eQttXHo1CPSLzx_61AYuivVMB_o",
@@ -296,6 +437,7 @@
   };
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
+  const db = getFirestore(app);
 
   onAuthStateChanged(auth, (user) => {
     if (!user) window.location.href = 'index.html';
@@ -357,6 +499,47 @@
   let linkSourceId = null; // fiche en attente de connexion
 
   // ================================================================
+  // Palette de couleurs (brillantes) — pour les fiches et le chat
+  // ================================================================
+  const COLOR_PALETTE = [
+    { name: 'Doré',      hex: '#d4af37' },
+    { name: 'Émeraude',  hex: '#17a367' },
+    { name: 'Rubis',     hex: '#b3273e' },
+    { name: 'Saphir',    hex: '#1f4e8c' },
+    { name: 'Améthyste', hex: '#6b3fa0' },
+    { name: 'Corail',    hex: '#e0654f' },
+    { name: 'Argent',    hex: '#9aa0a6' },
+    { name: 'Cuivre',    hex: '#a9673a' }
+  ];
+
+  function hexToRgba(hex, alpha){
+    const h = hex.replace('#', '');
+    const bigint = parseInt(h, 16);
+    const r = (bigint >> 16) & 255;
+    const g = (bigint >> 8) & 255;
+    const b = bigint & 255;
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function styleSwatch(btn, hex){
+    btn.style.background = `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.9), rgba(255,255,255,0) 45%), ${hex}`;
+    btn.style.boxShadow = `0 0 8px ${hexToRgba(hex, 0.75)}, inset 0 -2px 4px rgba(0,0,0,0.25)`;
+  }
+
+  function createSwatch(hex, isSelected, onPick){
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'color-swatch' + (isSelected ? ' selected' : '');
+    btn.title = hex;
+    styleSwatch(btn, hex);
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onPick(hex);
+    });
+    return btn;
+  }
+
+  // ================================================================
   // Projets
   // ================================================================
   function renderProjects(){
@@ -414,7 +597,8 @@
       content: '',
       x: 60 + (count % 6) * 36,
       y: 60 + (count % 6) * 36,
-      collapsed: false
+      collapsed: false,
+      color: null
     };
     state.cards.push(card);
     saveState();
@@ -430,6 +614,22 @@
     renderCards();
   }
 
+  function applyCardColor(el, hex){
+    if (hex) {
+      el.style.borderColor = hex;
+      el.style.boxShadow = `0 0 16px ${hexToRgba(hex, 0.55)}, 0 6px 18px rgba(44,30,15,0.18)`;
+    } else {
+      el.style.borderColor = '';
+      el.style.boxShadow = '';
+    }
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.color-popover') && !e.target.closest('.palette-btn')) {
+      document.querySelectorAll('.color-popover').forEach(p => p.classList.add('hidden'));
+    }
+  });
+
   function buildCardElement(cardData){
     const el = document.createElement('div');
     el.className = 'card' + (cardData.collapsed ? ' collapsed' : '');
@@ -441,14 +641,18 @@
       <div class="card-header">
         <span class="drag-handle" title="Déplacer">⠿</span>
         <span class="card-title" contenteditable="true" spellcheck="false"></span>
+        <button class="icon-btn palette-btn" title="Couleur de la fiche">🎨</button>
         <button class="icon-btn link-btn" title="Créer un lien">🔗</button>
         <button class="icon-btn collapse-btn" title="Replier / déplier">${cardData.collapsed ? '▸' : '▾'}</button>
         <button class="icon-btn delete-btn" title="Supprimer">✕</button>
       </div>
+      <div class="color-popover hidden"></div>
       <div class="card-body">
         <div class="card-content" contenteditable="true" spellcheck="false"></div>
       </div>
     `;
+
+    applyCardColor(el, cardData.color);
 
     el.querySelector('.card-title').textContent = cardData.title;
     el.querySelector('.card-content').textContent = cardData.content;
@@ -492,6 +696,29 @@
       e.stopPropagation();
       handleLinkClick(cardData.id, el);
     });
+
+    // Couleur de la fiche
+    const popover = el.querySelector('.color-popover');
+    COLOR_PALETTE.forEach(c => {
+      popover.appendChild(createSwatch(c.hex, cardData.color === c.hex, (hex) => {
+        cardData.color = (cardData.color === hex) ? null : hex;
+        applyCardColor(el, cardData.color);
+        popover.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+        if (cardData.color) {
+          const match = [...popover.children].find((s, i) => COLOR_PALETTE[i].hex === cardData.color);
+          if (match) match.classList.add('selected');
+        }
+        saveState();
+        popover.classList.add('hidden');
+      }));
+    });
+    el.querySelector('.palette-btn').addEventListener('mousedown', (e) => e.stopPropagation());
+    el.querySelector('.palette-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.color-popover').forEach(p => { if (p !== popover) p.classList.add('hidden'); });
+      popover.classList.toggle('hidden');
+    });
+    popover.addEventListener('mousedown', (e) => e.stopPropagation());
 
     // Déplacement (drag)
     const handle = el.querySelector('.drag-handle');
@@ -617,6 +844,82 @@
       svg.appendChild(path);
     });
   }
+
+  // ================================================================
+  // Chat en temps réel (Firestore)
+  // ================================================================
+  const chatToggle = document.getElementById('chat-toggle');
+  const chatPanel = document.getElementById('chat-panel');
+  const chatClose = document.getElementById('chat-close');
+  const chatMessages = document.getElementById('chat-messages');
+  const chatColorRow = document.getElementById('chat-color-row');
+  const chatForm = document.getElementById('chat-form');
+  const chatInput = document.getElementById('chat-input');
+
+  const CHAT_COLOR_KEY = 'chat-message-color';
+  let chatColor = localStorage.getItem(CHAT_COLOR_KEY) || COLOR_PALETTE[1].hex;
+
+  function renderChatColorRow(){
+    chatColorRow.innerHTML = '';
+    COLOR_PALETTE.forEach(c => {
+      chatColorRow.appendChild(createSwatch(c.hex, chatColor === c.hex, (hex) => {
+        chatColor = hex;
+        localStorage.setItem(CHAT_COLOR_KEY, chatColor);
+        renderChatColorRow();
+      }));
+    });
+  }
+  renderChatColorRow();
+
+  chatToggle.addEventListener('click', () => chatPanel.classList.toggle('hidden'));
+  chatClose.addEventListener('click', () => chatPanel.classList.add('hidden'));
+
+  chatForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = chatInput.value.trim();
+    if (!text) return;
+    const user = auth.currentUser;
+    const username = (user && (user.displayName || (user.email ? user.email.split('@')[0] : null))) || 'Anonyme';
+    chatInput.value = '';
+    try {
+      await addDoc(collection(db, 'messages'), {
+        username,
+        text,
+        color: chatColor,
+        createdAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.error('Envoi impossible', err);
+    }
+  });
+
+  const messagesQuery = query(collection(db, 'messages'), orderBy('createdAt'), limit(200));
+  onSnapshot(messagesQuery, (snapshot) => {
+    chatMessages.innerHTML = '';
+    snapshot.forEach(docSnap => {
+      const m = docSnap.data();
+      const line = document.createElement('div');
+      line.className = 'chat-message';
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'chat-username';
+      const color = m.color || COLOR_PALETTE[1].hex;
+      nameSpan.style.color = color;
+      nameSpan.style.textShadow = `0 0 6px ${hexToRgba(color, 0.6)}`;
+      nameSpan.textContent = m.username;
+
+      const textSpan = document.createElement('span');
+      textSpan.className = 'chat-text';
+      textSpan.textContent = ' ' + (m.text || '');
+
+      line.appendChild(nameSpan);
+      line.appendChild(textSpan);
+      chatMessages.appendChild(line);
+    });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }, (err) => {
+    console.error('Erreur de réception du chat', err);
+  });
 
   // ================================================================
   // Démarrage
