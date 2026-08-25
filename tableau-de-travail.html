@@ -19,37 +19,268 @@
     --muted:#7a6449;
   }
   *{box-sizing:border-box;}
-  html,body{height:100%;}
+  html,body{height:100%;margin:0;}
   body{
-    margin:0;
+    display:flex;
+    overflow:hidden;
+    font-family:'Cormorant Garamond',serif;
+    color:var(--ink);
+    background:var(--paper);
+  }
+
+  /* ---------- Sidebar ---------- */
+  #sidebar{
+    width:240px;
+    flex-shrink:0;
+    background:var(--panel);
+    border-right:1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    padding:22px 16px;
+    height:100vh;
+  }
+  #sidebar h2{
+    font-family:'Cinzel',serif;
+    font-size:14px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--accent-2);
+    margin:0 0 16px;
+  }
+  #project-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    overflow-y:auto;
+    flex:1;
+  }
+  .project-item{
+    font-size:16px;
+    padding:9px 12px;
+    border-radius:3px;
+    cursor:pointer;
+    border:1px solid transparent;
+    color:var(--ink);
+    transition:background .15s ease;
+  }
+  .project-item:hover{background:rgba(122,78,36,0.08);}
+  .project-item.active{
+    background:rgba(15,107,69,0.12);
+    border-color:var(--emerald);
+    color:var(--emerald-deep);
+    font-weight:600;
+  }
+  #add-project-row{
+    display:flex;
+    gap:6px;
+    margin-top:14px;
+  }
+  #new-project-input{
+    flex:1;
+    min-width:0;
+    padding:8px 10px;
+    border:1px solid var(--line);
+    border-radius:3px;
+    font-family:'Cormorant Garamond',serif;
+    font-size:15px;
+    background:rgba(255,255,255,0.5);
+    color:var(--ink);
+  }
+  #new-project-input:focus{outline:none;border-color:var(--emerald);}
+  #add-project-btn{
+    flex-shrink:0;
+    font-family:'Cinzel',serif;
+    font-size:16px;
+    line-height:1;
+    background:var(--emerald);
+    color:var(--panel);
+    border:none;
+    border-radius:3px;
+    padding:0 12px;
+    cursor:pointer;
+  }
+  #add-project-btn:hover{background:var(--emerald-deep);}
+
+  /* ---------- Main area ---------- */
+  #main{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+  }
+  #topbar{
+    height:64px;
+    flex-shrink:0;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 24px;
+    background:var(--panel);
+    border-bottom:1px solid var(--line);
+  }
+  #topbar .right{display:flex;gap:10px;}
+  .btn{
+    font-family:'Cinzel',serif;
+    font-weight:600;
+    font-size:13px;
+    letter-spacing:0.03em;
+    border:none;
+    border-radius:3px;
+    padding:11px 18px;
+    cursor:pointer;
+    transition:opacity .15s ease, background .15s ease;
+  }
+  .btn-primary{
+    background:linear-gradient(180deg,var(--emerald) 0%,var(--emerald-deep) 100%);
+    color:var(--panel);
+  }
+  .btn-primary:hover{opacity:0.9;}
+  .btn-secondary{
+    background:transparent;
+    color:var(--accent-2);
+    border:1px solid var(--line);
+  }
+  .btn-secondary:hover{background:rgba(122,78,36,0.08);}
+
+  #link-status{
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic;
+    font-size:14px;
+    color:var(--emerald-deep);
+  }
+
+  #canvas-wrap{
+    flex:1;
+    overflow:auto;
+    position:relative;
     background:
       radial-gradient(ellipse 80% 60% at 50% 0%, rgba(15,107,69,0.08), transparent 60%),
       radial-gradient(ellipse 70% 60% at 100% 100%, rgba(122,78,36,0.15), transparent 60%),
       var(--paper);
-    color:var(--ink);
-    font-family:'Cormorant Garamond',serif;
-    min-height:100vh;
   }
-  #logout-btn{
-    position:fixed;
-    top:20px;
-    right:20px;
-    font-family:'Cinzel',serif;
-    font-size:12px;
-    letter-spacing:0.04em;
-    background:transparent;
-    color:var(--accent-2);
-    border:1px solid var(--line);
-    border-radius:3px;
-    padding:9px 14px;
+  #canvas{
+    position:relative;
+    width:3200px;
+    height:2200px;
+  }
+  #links-svg{
+    position:absolute;
+    top:0; left:0;
+    width:100%;
+    height:100%;
+    pointer-events:none;
+  }
+  #links-svg path{
+    pointer-events:stroke;
     cursor:pointer;
   }
-  #logout-btn:hover{background:rgba(122,78,36,0.08);border-color:var(--accent-2);}
+
+  /* ---------- Cards ---------- */
+  .card{
+    position:absolute;
+    width:260px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    box-shadow:0 6px 18px rgba(44,30,15,0.18);
+    overflow:hidden;
+  }
+  .card.linking-source{
+    box-shadow:0 0 0 3px rgba(15,107,69,0.5), 0 6px 18px rgba(44,30,15,0.18);
+  }
+  .card-header{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:9px 8px 9px 10px;
+    background:linear-gradient(180deg,var(--emerald) 0%,var(--emerald-deep) 100%);
+    color:var(--panel);
+  }
+  .drag-handle{
+    cursor:move;
+    font-size:14px;
+    opacity:0.8;
+    user-select:none;
+  }
+  .card-title{
+    flex:1;
+    font-family:'Cinzel',serif;
+    font-size:13px;
+    letter-spacing:0.02em;
+    outline:none;
+    min-width:0;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    padding:2px 4px;
+    border-radius:2px;
+  }
+  .card-title:focus{
+    white-space:normal;
+    background:rgba(255,255,255,0.12);
+  }
+  .icon-btn{
+    background:transparent;
+    border:none;
+    color:var(--panel);
+    font-size:13px;
+    line-height:1;
+    cursor:pointer;
+    padding:4px 5px;
+    border-radius:3px;
+    opacity:0.85;
+  }
+  .icon-btn:hover{opacity:1;background:rgba(255,255,255,0.15);}
+  .card-body{
+    padding:12px 14px 14px;
+  }
+  .card.collapsed .card-body{display:none;}
+  .card-content{
+    font-family:'Cormorant Garamond',serif;
+    font-size:15px;
+    line-height:1.5;
+    min-height:70px;
+    outline:none;
+    color:var(--ink);
+  }
+  .card-content:empty::before{
+    content:"Écrivez ici…";
+    color:var(--muted);
+    font-style:italic;
+  }
 </style>
 </head>
 <body>
-<!-- Contenu du tableau de travail à venir -->
-<button id="logout-btn">Se déconnecter</button>
+
+<aside id="sidebar">
+  <h2>Projets</h2>
+  <div id="project-list"></div>
+  <div id="add-project-row">
+    <input type="text" id="new-project-input" placeholder="Nouveau projet…">
+    <button id="add-project-btn">+</button>
+  </div>
+</aside>
+
+<div id="main">
+  <div id="topbar">
+    <button class="btn btn-secondary" id="logout-btn">Déconnexion</button>
+    <span id="link-status"></span>
+    <div class="right">
+      <button class="btn btn-primary" id="new-doc-btn">Créer un document</button>
+    </div>
+  </div>
+  <div id="canvas-wrap">
+    <div id="canvas">
+      <svg id="links-svg">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L9,3 z" fill="#7a4e24"></path>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+  </div>
+</div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
@@ -63,21 +294,335 @@
     messagingSenderId: "120615573034",
     appId: "1:120615573034:web:7a26169618cf5a04659553"
   };
-
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
 
-  // Si personne n'est connecté, retour à la page de connexion.
   onAuthStateChanged(auth, (user) => {
-    if (!user) {
-      window.location.href = 'index.html';
-    }
+    if (!user) window.location.href = 'index.html';
   });
 
   document.getElementById('logout-btn').addEventListener('click', async () => {
     await signOut(auth);
     window.location.href = 'index.html';
   });
+
+  // ================================================================
+  // État du tableau (persisté dans le navigateur)
+  // ================================================================
+  const STORAGE_KEY = 'tableau-de-travail-state';
+
+  function defaultState(){
+    return {
+      projects: [{ id: 1, name: 'Général' }],
+      selectedProjectId: 1,
+      cards: [],
+      links: [],
+      nextProjectId: 2,
+      nextCardId: 1,
+      nextLinkId: 1
+    };
+  }
+
+  function loadState(){
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return defaultState();
+      const parsed = JSON.parse(raw);
+      if (!parsed.projects || !parsed.projects.length) return defaultState();
+      return parsed;
+    } catch {
+      return defaultState();
+    }
+  }
+
+  let state = loadState();
+
+  function saveState(){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch (e) { console.error('Sauvegarde impossible', e); }
+  }
+
+  // ================================================================
+  // Références DOM
+  // ================================================================
+  const projectListEl = document.getElementById('project-list');
+  const newProjectInput = document.getElementById('new-project-input');
+  const addProjectBtn = document.getElementById('add-project-btn');
+  const canvas = document.getElementById('canvas');
+  const canvasWrap = document.getElementById('canvas-wrap');
+  const svg = document.getElementById('links-svg');
+  const newDocBtn = document.getElementById('new-doc-btn');
+  const linkStatus = document.getElementById('link-status');
+
+  let linkSourceId = null; // fiche en attente de connexion
+
+  // ================================================================
+  // Projets
+  // ================================================================
+  function renderProjects(){
+    projectListEl.innerHTML = '';
+    state.projects.forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'project-item' + (p.id === state.selectedProjectId ? ' active' : '');
+      item.textContent = p.name;
+      item.addEventListener('click', () => {
+        state.selectedProjectId = p.id;
+        cancelLinking();
+        saveState();
+        renderProjects();
+        renderCards();
+      });
+      projectListEl.appendChild(item);
+    });
+  }
+
+  function addProject(name){
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const project = { id: state.nextProjectId++, name: trimmed };
+    state.projects.push(project);
+    state.selectedProjectId = project.id;
+    saveState();
+    renderProjects();
+    renderCards();
+  }
+
+  addProjectBtn.addEventListener('click', () => {
+    addProject(newProjectInput.value);
+    newProjectInput.value = '';
+  });
+  newProjectInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      addProject(newProjectInput.value);
+      newProjectInput.value = '';
+    }
+  });
+
+  // ================================================================
+  // Fiches (cartes)
+  // ================================================================
+  function cardsForCurrentProject(){
+    return state.cards.filter(c => c.projectId === state.selectedProjectId);
+  }
+
+  function createCard(){
+    const count = cardsForCurrentProject().length;
+    const card = {
+      id: state.nextCardId++,
+      projectId: state.selectedProjectId,
+      title: 'Nouveau document',
+      content: '',
+      x: 60 + (count % 6) * 36,
+      y: 60 + (count % 6) * 36,
+      collapsed: false
+    };
+    state.cards.push(card);
+    saveState();
+    renderCards();
+  }
+
+  newDocBtn.addEventListener('click', createCard);
+
+  function deleteCard(id){
+    state.cards = state.cards.filter(c => c.id !== id);
+    state.links = state.links.filter(l => l.fromId !== id && l.toId !== id);
+    saveState();
+    renderCards();
+  }
+
+  function buildCardElement(cardData){
+    const el = document.createElement('div');
+    el.className = 'card' + (cardData.collapsed ? ' collapsed' : '');
+    el.style.left = cardData.x + 'px';
+    el.style.top = cardData.y + 'px';
+    el.dataset.id = cardData.id;
+
+    el.innerHTML = `
+      <div class="card-header">
+        <span class="drag-handle" title="Déplacer">⠿</span>
+        <span class="card-title" contenteditable="true" spellcheck="false"></span>
+        <button class="icon-btn link-btn" title="Créer un lien">🔗</button>
+        <button class="icon-btn collapse-btn" title="Replier / déplier">${cardData.collapsed ? '▸' : '▾'}</button>
+        <button class="icon-btn delete-btn" title="Supprimer">✕</button>
+      </div>
+      <div class="card-body">
+        <div class="card-content" contenteditable="true" spellcheck="false"></div>
+      </div>
+    `;
+
+    el.querySelector('.card-title').textContent = cardData.title;
+    el.querySelector('.card-content').textContent = cardData.content;
+
+    // Titre éditable
+    const titleEl = el.querySelector('.card-title');
+    titleEl.addEventListener('input', () => {
+      cardData.title = titleEl.textContent;
+      saveState();
+    });
+    titleEl.addEventListener('mousedown', (e) => e.stopPropagation());
+
+    // Contenu éditable
+    const contentEl = el.querySelector('.card-content');
+    contentEl.addEventListener('input', () => {
+      cardData.content = contentEl.textContent;
+      saveState();
+    });
+    contentEl.addEventListener('mousedown', (e) => e.stopPropagation());
+
+    // Replier / déplier
+    el.querySelector('.collapse-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      cardData.collapsed = !cardData.collapsed;
+      el.classList.toggle('collapsed', cardData.collapsed);
+      e.currentTarget.textContent = cardData.collapsed ? '▸' : '▾';
+      saveState();
+      redrawLinks();
+    });
+
+    // Supprimer
+    el.querySelector('.delete-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (confirm('Supprimer cette fiche ainsi que ses liens ?')) {
+        deleteCard(cardData.id);
+      }
+    });
+
+    // Créer un lien
+    el.querySelector('.link-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleLinkClick(cardData.id, el);
+    });
+
+    // Déplacement (drag)
+    const handle = el.querySelector('.drag-handle');
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startLeft = cardData.x;
+      const startTop = cardData.y;
+
+      function onMove(ev){
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        cardData.x = Math.max(0, startLeft + dx);
+        cardData.y = Math.max(0, startTop + dy);
+        el.style.left = cardData.x + 'px';
+        el.style.top = cardData.y + 'px';
+        redrawLinks();
+      }
+      function onUp(){
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        saveState();
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    return el;
+  }
+
+  function renderCards(){
+    // Retire toutes les fiches existantes du DOM (garde le SVG)
+    canvas.querySelectorAll('.card').forEach(c => c.remove());
+    cardsForCurrentProject().forEach(cardData => {
+      canvas.appendChild(buildCardElement(cardData));
+    });
+    redrawLinks();
+  }
+
+  // ================================================================
+  // Liens entre fiches
+  // ================================================================
+  function handleLinkClick(cardId, cardEl){
+    if (linkSourceId === null) {
+      linkSourceId = cardId;
+      cardEl.classList.add('linking-source');
+      linkStatus.textContent = 'Cliquez sur 🔗 d’une autre fiche pour créer le lien (Échap pour annuler)';
+    } else if (linkSourceId === cardId) {
+      cancelLinking();
+    } else {
+      state.links.push({ id: state.nextLinkId++, fromId: linkSourceId, toId: cardId });
+      saveState();
+      cancelLinking();
+      redrawLinks();
+    }
+  }
+
+  function cancelLinking(){
+    linkSourceId = null;
+    linkStatus.textContent = '';
+    canvas.querySelectorAll('.card.linking-source').forEach(c => c.classList.remove('linking-source'));
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') cancelLinking();
+  });
+  canvasWrap.addEventListener('mousedown', (e) => {
+    if (e.target === canvasWrap || e.target === canvas) cancelLinking();
+  });
+
+  function rectOf(el){
+    return { left: el.offsetLeft, top: el.offsetTop, width: el.offsetWidth, height: el.offsetHeight };
+  }
+
+  function edgePoint(rect, targetX, targetY){
+    const rx = rect.left + rect.width / 2;
+    const ry = rect.top + rect.height / 2;
+    const dx = targetX - rx;
+    const dy = targetY - ry;
+    if (dx === 0 && dy === 0) return { x: rx, y: ry };
+    const halfW = rect.width / 2;
+    const halfH = rect.height / 2;
+    const scaleX = dx !== 0 ? halfW / Math.abs(dx) : Infinity;
+    const scaleY = dy !== 0 ? halfH / Math.abs(dy) : Infinity;
+    const scale = Math.min(scaleX, scaleY);
+    return { x: rx + dx * scale, y: ry + dy * scale };
+  }
+
+  function redrawLinks(){
+    svg.querySelectorAll('path.link-line').forEach(p => p.remove());
+    const visibleIds = new Set(cardsForCurrentProject().map(c => c.id));
+
+    state.links.forEach(link => {
+      if (!visibleIds.has(link.fromId) || !visibleIds.has(link.toId)) return;
+      const fromEl = canvas.querySelector(`.card[data-id="${link.fromId}"]`);
+      const toEl = canvas.querySelector(`.card[data-id="${link.toId}"]`);
+      if (!fromEl || !toEl) return;
+
+      const rectA = rectOf(fromEl);
+      const rectB = rectOf(toEl);
+      const centerA = { x: rectA.left + rectA.width / 2, y: rectA.top + rectA.height / 2 };
+      const centerB = { x: rectB.left + rectB.width / 2, y: rectB.top + rectB.height / 2 };
+
+      const start = edgePoint(rectA, centerB.x, centerB.y);
+      const end = edgePoint(rectB, centerA.x, centerA.y);
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('class', 'link-line');
+      path.setAttribute('d', `M ${start.x} ${start.y} L ${end.x} ${end.y}`);
+      path.setAttribute('stroke', '#7a4e24');
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('marker-end', 'url(#arrowhead)');
+      path.style.pointerEvents = 'stroke';
+      path.addEventListener('dblclick', () => {
+        if (confirm('Supprimer ce lien ?')) {
+          state.links = state.links.filter(l => l.id !== link.id);
+          saveState();
+          redrawLinks();
+        }
+      });
+      svg.appendChild(path);
+    });
+  }
+
+  // ================================================================
+  // Démarrage
+  // ================================================================
+  renderProjects();
+  renderCards();
 </script>
 </body>
 </html>
