@@ -134,6 +134,22 @@
   }
   #add-project-btn:hover{background:var(--emerald-deep);}
 
+  #my-color-section{margin-top:16px;}
+  .my-color-label{
+    font-family:'Cinzel',serif;
+    font-size:11px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--accent-2);
+    margin:0 0 8px;
+  }
+  .color-grid{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:10px;
+    justify-items:center;
+  }
+
   /* ---------- Main area ---------- */
   #main{
     flex:1;
@@ -414,6 +430,10 @@
 <aside id="sidebar">
   <h2>Projets</h2>
   <div id="project-list"></div>
+  <div id="my-color-section">
+    <p class="my-color-label">Ma couleur</p>
+    <div id="my-color-row" class="color-grid"></div>
+  </div>
   <div id="add-project-row">
     <input type="text" id="new-project-input" placeholder="Nouveau projet…">
     <button id="add-project-btn">+</button>
@@ -448,7 +468,6 @@
     <button id="chat-close" class="icon-btn" title="Fermer">✕</button>
   </div>
   <div id="chat-messages"></div>
-  <div class="chat-color-row" id="chat-color-row"></div>
   <form class="chat-form" id="chat-form">
     <input type="text" id="chat-input" placeholder="Votre message…" autocomplete="off">
     <button type="submit" class="btn btn-primary">Envoyer</button>
@@ -540,11 +559,28 @@
     }
   }
 
+  const MY_COLOR_KEY = 'my-color';
+  let myColor = localStorage.getItem(MY_COLOR_KEY) || COLOR_PALETTE[1].hex;
+  const myColorRow = document.getElementById('my-color-row');
+
+  function renderMyColorRow(){
+    myColorRow.innerHTML = '';
+    COLOR_PALETTE.forEach(c => {
+      myColorRow.appendChild(createSwatch(c.hex, myColor === c.hex, (hex) => {
+        myColor = hex;
+        localStorage.setItem(MY_COLOR_KEY, myColor);
+        renderMyColorRow();
+      }));
+    });
+  }
+  renderMyColorRow();
+
   document.addEventListener('click', (e) => {
     if (!e.target.closest('.color-popover') && !e.target.closest('.palette-btn')) {
       document.querySelectorAll('.color-popover').forEach(p => p.classList.add('hidden'));
     }
   });
+
 
   // ================================================================
   // Références DOM
@@ -725,7 +761,7 @@
       x: 60 + (count % 6) * 36,
       y: 60 + (count % 6) * 36,
       collapsed: false,
-      color: null,
+      color: myColor,
       createdAt: serverTimestamp()
     });
   }
@@ -964,24 +1000,8 @@
   const chatPanel = document.getElementById('chat-panel');
   const chatClose = document.getElementById('chat-close');
   const chatMessages = document.getElementById('chat-messages');
-  const chatColorRow = document.getElementById('chat-color-row');
   const chatForm = document.getElementById('chat-form');
   const chatInput = document.getElementById('chat-input');
-
-  const CHAT_COLOR_KEY = 'chat-message-color';
-  let chatColor = localStorage.getItem(CHAT_COLOR_KEY) || COLOR_PALETTE[1].hex;
-
-  function renderChatColorRow(){
-    chatColorRow.innerHTML = '';
-    COLOR_PALETTE.forEach(c => {
-      chatColorRow.appendChild(createSwatch(c.hex, chatColor === c.hex, (hex) => {
-        chatColor = hex;
-        localStorage.setItem(CHAT_COLOR_KEY, chatColor);
-        renderChatColorRow();
-      }));
-    });
-  }
-  renderChatColorRow();
 
   chatToggle.addEventListener('click', () => chatPanel.classList.toggle('hidden'));
   chatClose.addEventListener('click', () => chatPanel.classList.add('hidden'));
@@ -995,7 +1015,7 @@
     chatInput.value = '';
     try {
       await addDoc(collection(db, 'messages'), {
-        username, text, color: chatColor, createdAt: serverTimestamp()
+        username, text, color: myColor, createdAt: serverTimestamp()
       });
     } catch (err) {
       console.error('Envoi impossible', err);
