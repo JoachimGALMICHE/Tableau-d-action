@@ -55,8 +55,12 @@
     flex:1;
   }
   .project-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:6px;
     font-size:16px;
-    padding:9px 12px;
+    padding:9px 10px;
     border-radius:3px;
     cursor:pointer;
     border:1px solid transparent;
@@ -70,6 +74,35 @@
     color:var(--emerald-deep);
     font-weight:600;
   }
+  .project-name{
+    flex:1;
+    min-width:0;
+    outline:none;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    padding:2px 4px;
+    border-radius:2px;
+  }
+  .project-name[contenteditable="true"]{
+    white-space:normal;
+    background:rgba(255,255,255,0.5);
+    cursor:text;
+  }
+  .project-edit-btn{
+    flex-shrink:0;
+    background:transparent;
+    border:none;
+    font-size:12px;
+    opacity:0;
+    cursor:pointer;
+    color:var(--accent-2);
+    padding:2px 4px;
+    border-radius:3px;
+    transition:opacity .12s ease;
+  }
+  .project-item:hover .project-edit-btn{opacity:0.85;}
+  .project-edit-btn:hover{opacity:1 !important;background:rgba(122,78,36,0.15);}
   #add-project-row{
     display:flex;
     gap:6px;
@@ -189,9 +222,10 @@
     box-shadow:0 0 0 3px rgba(15,107,69,0.5), 0 6px 18px rgba(44,30,15,0.18);
   }
   .card-header{
+    position:relative;
     display:flex;
     align-items:center;
-    gap:8px;
+    gap:6px;
     padding:9px 8px 9px 10px;
     background:linear-gradient(180deg,var(--emerald) 0%,var(--emerald-deep) 100%);
     color:var(--panel);
@@ -280,7 +314,6 @@
     box-shadow:0 8px 20px rgba(44,30,15,0.3);
   }
   .color-popover.hidden{display:none;}
-  .card-header{position:relative;}
 
   /* ---------- Chat en temps réel ---------- */
   #chat-toggle{
@@ -425,7 +458,10 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-  import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+  import {
+    getFirestore, collection, doc, addDoc, updateDoc, deleteDoc,
+    query, where, orderBy, onSnapshot, serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDDZI33eQttXHo1CPSLzx_61AYuivVMB_o",
@@ -448,55 +484,10 @@
     window.location.href = 'index.html';
   });
 
-  // ================================================================
-  // État du tableau (persisté dans le navigateur)
-  // ================================================================
-  const STORAGE_KEY = 'tableau-de-travail-state';
-
-  function defaultState(){
-    return {
-      projects: [{ id: 1, name: 'Général' }],
-      selectedProjectId: 1,
-      cards: [],
-      links: [],
-      nextProjectId: 2,
-      nextCardId: 1,
-      nextLinkId: 1
-    };
+  function debounce(fn, delay){
+    let t;
+    return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
   }
-
-  function loadState(){
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return defaultState();
-      const parsed = JSON.parse(raw);
-      if (!parsed.projects || !parsed.projects.length) return defaultState();
-      return parsed;
-    } catch {
-      return defaultState();
-    }
-  }
-
-  let state = loadState();
-
-  function saveState(){
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
-    catch (e) { console.error('Sauvegarde impossible', e); }
-  }
-
-  // ================================================================
-  // Références DOM
-  // ================================================================
-  const projectListEl = document.getElementById('project-list');
-  const newProjectInput = document.getElementById('new-project-input');
-  const addProjectBtn = document.getElementById('add-project-btn');
-  const canvas = document.getElementById('canvas');
-  const canvasWrap = document.getElementById('canvas-wrap');
-  const svg = document.getElementById('links-svg');
-  const newDocBtn = document.getElementById('new-doc-btn');
-  const linkStatus = document.getElementById('link-status');
-
-  let linkSourceId = null; // fiche en attente de connexion
 
   // ================================================================
   // Palette de couleurs (brillantes) — pour les fiches et le chat
@@ -539,81 +530,6 @@
     return btn;
   }
 
-  // ================================================================
-  // Projets
-  // ================================================================
-  function renderProjects(){
-    projectListEl.innerHTML = '';
-    state.projects.forEach(p => {
-      const item = document.createElement('div');
-      item.className = 'project-item' + (p.id === state.selectedProjectId ? ' active' : '');
-      item.textContent = p.name;
-      item.addEventListener('click', () => {
-        state.selectedProjectId = p.id;
-        cancelLinking();
-        saveState();
-        renderProjects();
-        renderCards();
-      });
-      projectListEl.appendChild(item);
-    });
-  }
-
-  function addProject(name){
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    const project = { id: state.nextProjectId++, name: trimmed };
-    state.projects.push(project);
-    state.selectedProjectId = project.id;
-    saveState();
-    renderProjects();
-    renderCards();
-  }
-
-  addProjectBtn.addEventListener('click', () => {
-    addProject(newProjectInput.value);
-    newProjectInput.value = '';
-  });
-  newProjectInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      addProject(newProjectInput.value);
-      newProjectInput.value = '';
-    }
-  });
-
-  // ================================================================
-  // Fiches (cartes)
-  // ================================================================
-  function cardsForCurrentProject(){
-    return state.cards.filter(c => c.projectId === state.selectedProjectId);
-  }
-
-  function createCard(){
-    const count = cardsForCurrentProject().length;
-    const card = {
-      id: state.nextCardId++,
-      projectId: state.selectedProjectId,
-      title: 'Nouveau document',
-      content: '',
-      x: 60 + (count % 6) * 36,
-      y: 60 + (count % 6) * 36,
-      collapsed: false,
-      color: null
-    };
-    state.cards.push(card);
-    saveState();
-    renderCards();
-  }
-
-  newDocBtn.addEventListener('click', createCard);
-
-  function deleteCard(id){
-    state.cards = state.cards.filter(c => c.id !== id);
-    state.links = state.links.filter(l => l.fromId !== id && l.toId !== id);
-    saveState();
-    renderCards();
-  }
-
   function applyCardColor(el, hex){
     if (hex) {
       el.style.borderColor = hex;
@@ -630,12 +546,205 @@
     }
   });
 
-  function buildCardElement(cardData){
+  // ================================================================
+  // Références DOM
+  // ================================================================
+  const projectListEl = document.getElementById('project-list');
+  const newProjectInput = document.getElementById('new-project-input');
+  const addProjectBtn = document.getElementById('add-project-btn');
+  const canvas = document.getElementById('canvas');
+  const canvasWrap = document.getElementById('canvas-wrap');
+  const svg = document.getElementById('links-svg');
+  const newDocBtn = document.getElementById('new-doc-btn');
+  const linkStatus = document.getElementById('link-status');
+
+  let linkSourceId = null;
+  let draggingCardId = null;
+  let currentProjectId = null;
+  let latestProjects = [];
+  let unsubCards = null;
+  let unsubLinks = null;
+  const cardElements = new Map();
+  const cardDataCache = new Map();
+  const linksCache = new Map();
+
+  const projectsCol = collection(db, 'projects');
+  const cardsCol = collection(db, 'cards');
+  const linksCol = collection(db, 'links');
+
+  // ================================================================
+  // Projets (collection partagée en temps réel)
+  // ================================================================
+  let hasBootstrapped = false;
+
+  onSnapshot(query(projectsCol, orderBy('createdAt')), (snap) => {
+    latestProjects = [];
+    snap.forEach(d => latestProjects.push({ id: d.id, ...d.data() }));
+
+    if (!hasBootstrapped) {
+      hasBootstrapped = true;
+      if (latestProjects.length === 0) {
+        addDoc(projectsCol, { name: 'Général', createdAt: serverTimestamp() });
+        return; // le prochain snapshot contiendra le projet créé
+      }
+      selectProject(latestProjects[0].id);
+    } else if (currentProjectId && !latestProjects.find(p => p.id === currentProjectId)) {
+      if (latestProjects.length) selectProject(latestProjects[0].id);
+    }
+
+    renderProjects();
+  });
+
+  function renderProjects(){
+    projectListEl.innerHTML = '';
+    latestProjects.forEach(p => {
+      const item = document.createElement('div');
+      item.className = 'project-item' + (p.id === currentProjectId ? ' active' : '');
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'project-name';
+      nameSpan.textContent = p.name;
+      nameSpan.contentEditable = 'false';
+
+      nameSpan.addEventListener('mousedown', (e) => {
+        if (nameSpan.contentEditable === 'true') e.stopPropagation();
+      });
+      nameSpan.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); nameSpan.blur(); }
+      });
+      nameSpan.addEventListener('blur', () => {
+        if (nameSpan.contentEditable === 'true') {
+          nameSpan.contentEditable = 'false';
+          const newName = nameSpan.textContent.trim() || p.name;
+          nameSpan.textContent = newName;
+          if (newName !== p.name) {
+            updateDoc(doc(db, 'projects', p.id), { name: newName });
+          }
+        }
+      });
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'project-edit-btn';
+      editBtn.textContent = '✎';
+      editBtn.title = 'Renommer le projet';
+      editBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        nameSpan.contentEditable = 'true';
+        nameSpan.focus();
+        const range = document.createRange();
+        range.selectNodeContents(nameSpan);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      });
+
+      item.appendChild(nameSpan);
+      item.appendChild(editBtn);
+      item.addEventListener('click', () => {
+        if (nameSpan.contentEditable !== 'true') selectProject(p.id);
+      });
+      projectListEl.appendChild(item);
+    });
+  }
+
+  function addProject(name){
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    addDoc(projectsCol, { name: trimmed, createdAt: serverTimestamp() })
+      .then(ref => selectProject(ref.id));
+  }
+
+  addProjectBtn.addEventListener('click', () => {
+    addProject(newProjectInput.value);
+    newProjectInput.value = '';
+  });
+  newProjectInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      addProject(newProjectInput.value);
+      newProjectInput.value = '';
+    }
+  });
+
+  // ================================================================
+  // Sélection de projet -> abonnement au tableau (fiches + liens)
+  // ================================================================
+  function selectProject(projectId){
+    currentProjectId = projectId;
+    cancelLinking();
+    if (unsubCards) unsubCards();
+    if (unsubLinks) unsubLinks();
+    cardElements.forEach(el => el.remove());
+    cardElements.clear();
+    cardDataCache.clear();
+    linksCache.clear();
+    redrawLinks();
+    renderProjects();
+
+    const cardsQuery = query(cardsCol, where('projectId', '==', projectId));
+    unsubCards = onSnapshot(cardsQuery, (snapshot) => {
+      snapshot.docChanges().forEach(change => {
+        const id = change.doc.id;
+        const data = change.doc.data();
+        if (change.type === 'added') {
+          cardDataCache.set(id, data);
+          const el = buildCardElement(id, data);
+          cardElements.set(id, el);
+          canvas.appendChild(el);
+        } else if (change.type === 'modified') {
+          cardDataCache.set(id, data);
+          updateCardElement(id, data);
+        } else if (change.type === 'removed') {
+          const el = cardElements.get(id);
+          if (el) el.remove();
+          cardElements.delete(id);
+          cardDataCache.delete(id);
+        }
+      });
+      redrawLinks();
+    });
+
+    const linksQuery = query(linksCol, where('projectId', '==', projectId));
+    unsubLinks = onSnapshot(linksQuery, (snapshot) => {
+      linksCache.clear();
+      snapshot.forEach(d => linksCache.set(d.id, d.data()));
+      redrawLinks();
+    });
+  }
+
+  // ================================================================
+  // Fiches (cartes) — partagées en temps réel via Firestore
+  // ================================================================
+  function createCard(){
+    if (!currentProjectId) return;
+    const count = cardDataCache.size;
+    addDoc(cardsCol, {
+      projectId: currentProjectId,
+      title: 'Nouveau document',
+      content: '',
+      x: 60 + (count % 6) * 36,
+      y: 60 + (count % 6) * 36,
+      collapsed: false,
+      color: null,
+      createdAt: serverTimestamp()
+    });
+  }
+  newDocBtn.addEventListener('click', createCard);
+
+  function deleteCard(id){
+    deleteDoc(doc(db, 'cards', id));
+    linksCache.forEach((link, linkId) => {
+      if (link.fromId === id || link.toId === id) deleteDoc(doc(db, 'links', linkId));
+    });
+  }
+
+  function buildCardElement(id, cardData){
     const el = document.createElement('div');
     el.className = 'card' + (cardData.collapsed ? ' collapsed' : '');
-    el.style.left = cardData.x + 'px';
-    el.style.top = cardData.y + 'px';
-    el.dataset.id = cardData.id;
+    el.style.left = (cardData.x || 0) + 'px';
+    el.style.top = (cardData.y || 0) + 'px';
+    el.dataset.id = id;
+    applyCardColor(el, cardData.color || null);
 
     el.innerHTML = `
       <div class="card-header">
@@ -652,66 +761,53 @@
       </div>
     `;
 
-    applyCardColor(el, cardData.color);
-
-    el.querySelector('.card-title').textContent = cardData.title;
-    el.querySelector('.card-content').textContent = cardData.content;
-
-    // Titre éditable
     const titleEl = el.querySelector('.card-title');
-    titleEl.addEventListener('input', () => {
-      cardData.title = titleEl.textContent;
-      saveState();
-    });
+    const contentEl = el.querySelector('.card-content');
+    titleEl.textContent = cardData.title || '';
+    contentEl.textContent = cardData.content || '';
+
+    const saveTitle = debounce(() => updateDoc(doc(db, 'cards', id), { title: titleEl.textContent }), 400);
+    titleEl.addEventListener('input', saveTitle);
     titleEl.addEventListener('mousedown', (e) => e.stopPropagation());
 
-    // Contenu éditable
-    const contentEl = el.querySelector('.card-content');
-    contentEl.addEventListener('input', () => {
-      cardData.content = contentEl.textContent;
-      saveState();
-    });
+    const saveContent = debounce(() => updateDoc(doc(db, 'cards', id), { content: contentEl.textContent }), 400);
+    contentEl.addEventListener('input', saveContent);
     contentEl.addEventListener('mousedown', (e) => e.stopPropagation());
 
-    // Replier / déplier
     el.querySelector('.collapse-btn').addEventListener('click', (e) => {
       e.stopPropagation();
-      cardData.collapsed = !cardData.collapsed;
-      el.classList.toggle('collapsed', cardData.collapsed);
-      e.currentTarget.textContent = cardData.collapsed ? '▸' : '▾';
-      saveState();
+      const nowCollapsed = !el.classList.contains('collapsed');
+      el.classList.toggle('collapsed', nowCollapsed);
+      e.currentTarget.textContent = nowCollapsed ? '▸' : '▾';
+      updateDoc(doc(db, 'cards', id), { collapsed: nowCollapsed });
       redrawLinks();
     });
 
-    // Supprimer
     el.querySelector('.delete-btn').addEventListener('click', (e) => {
       e.stopPropagation();
-      if (confirm('Supprimer cette fiche ainsi que ses liens ?')) {
-        deleteCard(cardData.id);
-      }
+      if (confirm('Supprimer cette fiche ainsi que ses liens ?')) deleteCard(id);
     });
 
-    // Créer un lien
     el.querySelector('.link-btn').addEventListener('click', (e) => {
       e.stopPropagation();
-      handleLinkClick(cardData.id, el);
+      handleLinkClick(id, el);
     });
 
-    // Couleur de la fiche
     const popover = el.querySelector('.color-popover');
-    COLOR_PALETTE.forEach(c => {
-      popover.appendChild(createSwatch(c.hex, cardData.color === c.hex, (hex) => {
-        cardData.color = (cardData.color === hex) ? null : hex;
-        applyCardColor(el, cardData.color);
-        popover.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
-        if (cardData.color) {
-          const match = [...popover.children].find((s, i) => COLOR_PALETTE[i].hex === cardData.color);
-          if (match) match.classList.add('selected');
-        }
-        saveState();
-        popover.classList.add('hidden');
-      }));
-    });
+    function refreshPopoverSelection(currentHex){
+      popover.innerHTML = '';
+      COLOR_PALETTE.forEach(c => {
+        popover.appendChild(createSwatch(c.hex, currentHex === c.hex, (hex) => {
+          const newColor = (currentHex === hex) ? null : hex;
+          applyCardColor(el, newColor);
+          updateDoc(doc(db, 'cards', id), { color: newColor });
+          popover.classList.add('hidden');
+        }));
+      });
+    }
+    refreshPopoverSelection(cardData.color || null);
+    el._refreshPopoverSelection = refreshPopoverSelection;
+
     el.querySelector('.palette-btn').addEventListener('mousedown', (e) => e.stopPropagation());
     el.querySelector('.palette-btn').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -720,28 +816,35 @@
     });
     popover.addEventListener('mousedown', (e) => e.stopPropagation());
 
-    // Déplacement (drag)
     const handle = el.querySelector('.drag-handle');
     handle.addEventListener('mousedown', (e) => {
       e.preventDefault();
+      draggingCardId = id;
       const startX = e.clientX;
       const startY = e.clientY;
-      const startLeft = cardData.x;
-      const startTop = cardData.y;
+      const startLeft = el.offsetLeft;
+      const startTop = el.offsetTop;
+      let lastSent = 0;
 
       function onMove(ev){
         const dx = ev.clientX - startX;
         const dy = ev.clientY - startY;
-        cardData.x = Math.max(0, startLeft + dx);
-        cardData.y = Math.max(0, startTop + dy);
-        el.style.left = cardData.x + 'px';
-        el.style.top = cardData.y + 'px';
+        const nx = Math.max(0, startLeft + dx);
+        const ny = Math.max(0, startTop + dy);
+        el.style.left = nx + 'px';
+        el.style.top = ny + 'px';
         redrawLinks();
+        const now = Date.now();
+        if (now - lastSent > 120) {
+          lastSent = now;
+          updateDoc(doc(db, 'cards', id), { x: nx, y: ny });
+        }
       }
       function onUp(){
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        saveState();
+        draggingCardId = null;
+        updateDoc(doc(db, 'cards', id), { x: el.offsetLeft, y: el.offsetTop });
       }
       document.addEventListener('mousemove', onMove);
       document.addEventListener('mouseup', onUp);
@@ -750,13 +853,26 @@
     return el;
   }
 
-  function renderCards(){
-    // Retire toutes les fiches existantes du DOM (garde le SVG)
-    canvas.querySelectorAll('.card').forEach(c => c.remove());
-    cardsForCurrentProject().forEach(cardData => {
-      canvas.appendChild(buildCardElement(cardData));
-    });
-    redrawLinks();
+  function updateCardElement(id, data){
+    const el = cardElements.get(id);
+    if (!el) return;
+    const titleEl = el.querySelector('.card-title');
+    const contentEl = el.querySelector('.card-content');
+
+    if (document.activeElement !== titleEl) titleEl.textContent = data.title || '';
+    if (document.activeElement !== contentEl) contentEl.textContent = data.content || '';
+
+    if (draggingCardId !== id) {
+      el.style.left = (data.x || 0) + 'px';
+      el.style.top = (data.y || 0) + 'px';
+    }
+
+    const isCollapsed = !!data.collapsed;
+    el.classList.toggle('collapsed', isCollapsed);
+    el.querySelector('.collapse-btn').textContent = isCollapsed ? '▸' : '▾';
+
+    applyCardColor(el, data.color || null);
+    if (el._refreshPopoverSelection) el._refreshPopoverSelection(data.color || null);
   }
 
   // ================================================================
@@ -770,10 +886,13 @@
     } else if (linkSourceId === cardId) {
       cancelLinking();
     } else {
-      state.links.push({ id: state.nextLinkId++, fromId: linkSourceId, toId: cardId });
-      saveState();
+      addDoc(linksCol, {
+        projectId: currentProjectId,
+        fromId: linkSourceId,
+        toId: cardId,
+        createdAt: serverTimestamp()
+      });
       cancelLinking();
-      redrawLinks();
     }
   }
 
@@ -810,12 +929,9 @@
 
   function redrawLinks(){
     svg.querySelectorAll('path.link-line').forEach(p => p.remove());
-    const visibleIds = new Set(cardsForCurrentProject().map(c => c.id));
-
-    state.links.forEach(link => {
-      if (!visibleIds.has(link.fromId) || !visibleIds.has(link.toId)) return;
-      const fromEl = canvas.querySelector(`.card[data-id="${link.fromId}"]`);
-      const toEl = canvas.querySelector(`.card[data-id="${link.toId}"]`);
+    linksCache.forEach((link, linkId) => {
+      const fromEl = cardElements.get(link.fromId);
+      const toEl = cardElements.get(link.toId);
       if (!fromEl || !toEl) return;
 
       const rectA = rectOf(fromEl);
@@ -835,11 +951,7 @@
       path.setAttribute('marker-end', 'url(#arrowhead)');
       path.style.pointerEvents = 'stroke';
       path.addEventListener('dblclick', () => {
-        if (confirm('Supprimer ce lien ?')) {
-          state.links = state.links.filter(l => l.id !== link.id);
-          saveState();
-          redrawLinks();
-        }
+        if (confirm('Supprimer ce lien ?')) deleteDoc(doc(db, 'links', linkId));
       });
       svg.appendChild(path);
     });
@@ -883,18 +995,14 @@
     chatInput.value = '';
     try {
       await addDoc(collection(db, 'messages'), {
-        username,
-        text,
-        color: chatColor,
-        createdAt: serverTimestamp()
+        username, text, color: chatColor, createdAt: serverTimestamp()
       });
     } catch (err) {
       console.error('Envoi impossible', err);
     }
   });
 
-  const messagesQuery = query(collection(db, 'messages'), orderBy('createdAt'), limit(200));
-  onSnapshot(messagesQuery, (snapshot) => {
+  onSnapshot(query(collection(db, 'messages'), orderBy('createdAt')), (snapshot) => {
     chatMessages.innerHTML = '';
     snapshot.forEach(docSnap => {
       const m = docSnap.data();
@@ -920,12 +1028,6 @@
   }, (err) => {
     console.error('Erreur de réception du chat', err);
   });
-
-  // ================================================================
-  // Démarrage
-  // ================================================================
-  renderProjects();
-  renderCards();
 </script>
 </body>
 </html>
