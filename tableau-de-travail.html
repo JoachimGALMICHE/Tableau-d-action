@@ -243,8 +243,8 @@
     align-items:center;
     gap:6px;
     padding:9px 8px 9px 10px;
-    background:linear-gradient(180deg,var(--emerald) 0%,var(--emerald-deep) 100%);
-    color:var(--panel);
+    background:linear-gradient(180deg,var(--line) 0%,var(--accent-2) 100%);
+    color:#000;
   }
   .drag-handle{
     cursor:move;
@@ -272,7 +272,7 @@
   .icon-btn{
     background:transparent;
     border:none;
-    color:var(--panel);
+    color:#000;
     font-size:13px;
     line-height:1;
     cursor:pointer;
@@ -314,22 +314,6 @@
     outline:2px solid var(--ink);
     outline-offset:2px;
   }
-  .color-popover{
-    position:absolute;
-    top:100%;
-    right:8px;
-    z-index:30;
-    display:flex;
-    flex-wrap:wrap;
-    gap:8px;
-    width:150px;
-    padding:10px;
-    background:var(--panel);
-    border:1px solid var(--line);
-    border-radius:6px;
-    box-shadow:0 8px 20px rgba(44,30,15,0.3);
-  }
-  .color-popover.hidden{display:none;}
 
   /* ---------- Chat en temps réel ---------- */
   #chat-toggle{
@@ -549,13 +533,25 @@
     return btn;
   }
 
+  function darkenHex(hex, factor){
+    const h = hex.replace('#', '');
+    const bigint = parseInt(h, 16);
+    const r = Math.round(((bigint >> 16) & 255) * factor);
+    const g = Math.round(((bigint >> 8) & 255) * factor);
+    const b = Math.round((bigint & 255) * factor);
+    return `rgb(${r},${g},${b})`;
+  }
+
   function applyCardColor(el, hex){
+    const header = el.querySelector('.card-header');
     if (hex) {
       el.style.borderColor = hex;
       el.style.boxShadow = `0 0 16px ${hexToRgba(hex, 0.55)}, 0 6px 18px rgba(44,30,15,0.18)`;
+      if (header) header.style.background = `linear-gradient(180deg, ${hex} 0%, ${darkenHex(hex, 0.55)} 100%)`;
     } else {
       el.style.borderColor = '';
       el.style.boxShadow = '';
+      if (header) header.style.background = '';
     }
   }
 
@@ -574,12 +570,6 @@
     });
   }
   renderMyColorRow();
-
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('.color-popover') && !e.target.closest('.palette-btn')) {
-      document.querySelectorAll('.color-popover').forEach(p => p.classList.add('hidden'));
-    }
-  });
 
 
   // ================================================================
@@ -780,22 +770,21 @@
     el.style.left = (cardData.x || 0) + 'px';
     el.style.top = (cardData.y || 0) + 'px';
     el.dataset.id = id;
-    applyCardColor(el, cardData.color || null);
 
     el.innerHTML = `
       <div class="card-header">
         <span class="drag-handle" title="Déplacer">⠿</span>
         <span class="card-title" contenteditable="true" spellcheck="false"></span>
-        <button class="icon-btn palette-btn" title="Couleur de la fiche">🎨</button>
         <button class="icon-btn link-btn" title="Créer un lien">🔗</button>
         <button class="icon-btn collapse-btn" title="Replier / déplier">${cardData.collapsed ? '▸' : '▾'}</button>
         <button class="icon-btn delete-btn" title="Supprimer">✕</button>
       </div>
-      <div class="color-popover hidden"></div>
       <div class="card-body">
         <div class="card-content" contenteditable="true" spellcheck="false"></div>
       </div>
     `;
+
+    applyCardColor(el, cardData.color || null);
 
     const titleEl = el.querySelector('.card-title');
     const contentEl = el.querySelector('.card-content');
@@ -828,29 +817,6 @@
       e.stopPropagation();
       handleLinkClick(id, el);
     });
-
-    const popover = el.querySelector('.color-popover');
-    function refreshPopoverSelection(currentHex){
-      popover.innerHTML = '';
-      COLOR_PALETTE.forEach(c => {
-        popover.appendChild(createSwatch(c.hex, currentHex === c.hex, (hex) => {
-          const newColor = (currentHex === hex) ? null : hex;
-          applyCardColor(el, newColor);
-          updateDoc(doc(db, 'cards', id), { color: newColor });
-          popover.classList.add('hidden');
-        }));
-      });
-    }
-    refreshPopoverSelection(cardData.color || null);
-    el._refreshPopoverSelection = refreshPopoverSelection;
-
-    el.querySelector('.palette-btn').addEventListener('mousedown', (e) => e.stopPropagation());
-    el.querySelector('.palette-btn').addEventListener('click', (e) => {
-      e.stopPropagation();
-      document.querySelectorAll('.color-popover').forEach(p => { if (p !== popover) p.classList.add('hidden'); });
-      popover.classList.toggle('hidden');
-    });
-    popover.addEventListener('mousedown', (e) => e.stopPropagation());
 
     const handle = el.querySelector('.drag-handle');
     handle.addEventListener('mousedown', (e) => {
@@ -908,7 +874,6 @@
     el.querySelector('.collapse-btn').textContent = isCollapsed ? '▸' : '▾';
 
     applyCardColor(el, data.color || null);
-    if (el._refreshPopoverSelection) el._refreshPopoverSelection(data.color || null);
   }
 
   // ================================================================
