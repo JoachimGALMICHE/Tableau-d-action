@@ -292,12 +292,44 @@
     min-height:70px;
     outline:none;
     color:var(--ink);
+    white-space:pre-wrap;
+    word-wrap:break-word;
   }
   .card-content:empty::before{
     content:"Écrivez ici…";
     color:var(--muted);
     font-style:italic;
   }
+  .image-wrap{
+    position:relative;
+    margin-bottom:10px;
+  }
+  .card-image{
+    display:block;
+    width:100%;
+    max-height:220px;
+    object-fit:cover;
+    border-radius:4px;
+    border:1px solid var(--line);
+  }
+  .image-remove-btn{
+    position:absolute;
+    top:6px;
+    right:6px;
+    width:20px;
+    height:20px;
+    border:none;
+    border-radius:50%;
+    background:rgba(0,0,0,0.55);
+    color:#fff;
+    font-size:11px;
+    line-height:1;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .image-remove-btn:hover{background:rgba(0,0,0,0.75);}
 
   /* ---------- Swatches de couleur (brillants) ---------- */
   .color-swatch{
@@ -490,6 +522,23 @@
   function debounce(fn, delay){
     let t;
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+  }
+
+  function escapeHtml(str){
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function textToHtml(str){
+    return escapeHtml(str).replace(/\n/g, '<br>');
+  }
+
+  function isSafeImageUrl(url){
+    return /^https?:\/\//i.test(url) || /^data:image\//i.test(url);
   }
 
   // ================================================================
@@ -775,11 +824,16 @@
       <div class="card-header">
         <span class="drag-handle" title="Déplacer">⠿</span>
         <span class="card-title" contenteditable="true" spellcheck="false"></span>
+        <button class="icon-btn image-btn" title="Ajouter une image">🖼️</button>
         <button class="icon-btn link-btn" title="Créer un lien">🔗</button>
         <button class="icon-btn collapse-btn" title="Replier / déplier">${cardData.collapsed ? '▸' : '▾'}</button>
         <button class="icon-btn delete-btn" title="Supprimer">✕</button>
       </div>
       <div class="card-body">
+        <div class="image-wrap" style="display:none;">
+          <img class="card-image" alt="">
+          <button type="button" class="image-remove-btn" title="Retirer l'image">✕</button>
+        </div>
         <div class="card-content" contenteditable="true" spellcheck="false"></div>
       </div>
     `;
@@ -789,15 +843,55 @@
     const titleEl = el.querySelector('.card-title');
     const contentEl = el.querySelector('.card-content');
     titleEl.textContent = cardData.title || '';
-    contentEl.textContent = cardData.content || '';
+    contentEl.innerHTML = textToHtml(cardData.content || '');
 
     const saveTitle = debounce(() => updateDoc(doc(db, 'cards', id), { title: titleEl.textContent }), 400);
     titleEl.addEventListener('input', saveTitle);
     titleEl.addEventListener('mousedown', (e) => e.stopPropagation());
 
-    const saveContent = debounce(() => updateDoc(doc(db, 'cards', id), { content: contentEl.textContent }), 400);
+    const saveContent = debounce(() => updateDoc(doc(db, 'cards', id), { content: contentEl.innerText }), 400);
     contentEl.addEventListener('input', saveContent);
     contentEl.addEventListener('mousedown', (e) => e.stopPropagation());
+
+    // Image de la fiche
+    const imageWrap = el.querySelector('.image-wrap');
+    const imgEl = el.querySelector('.card-image');
+    const imageRemoveBtn = el.querySelector('.image-remove-btn');
+
+    function refreshImage(url){
+      if (url && isSafeImageUrl(url)) {
+        imgEl.src = url;
+        imageWrap.style.display = 'block';
+      } else {
+        imgEl.removeAttribute('src');
+        imageWrap.style.display = 'none';
+      }
+    }
+    refreshImage(cardData.imageUrl || null);
+    el._refreshImage = refreshImage;
+
+    imageRemoveBtn.addEventListener('mousedown', (e) => e.stopPropagation());
+    imageRemoveBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      updateDoc(doc(db, 'cards', id), { imageUrl: null });
+    });
+
+    el.querySelector('.image-btn').addEventListener('mousedown', (e) => e.stopPropagation());
+    el.querySelector('.image-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const input = prompt("Lien (URL) de l'image à afficher sur la fiche :", cardData.imageUrl || '');
+      if (input === null) return;
+      const trimmed = input.trim();
+      if (trimmed === '') {
+        updateDoc(doc(db, 'cards', id), { imageUrl: null });
+        return;
+      }
+      if (!isSafeImageUrl(trimmed)) {
+        alert("Lien d'image invalide : utilisez une URL commençant par http:// ou https://");
+        return;
+      }
+      updateDoc(doc(db, 'cards', id), { imageUrl: trimmed });
+    });
 
     el.querySelector('.collapse-btn').addEventListener('click', (e) => {
       e.stopPropagation();
@@ -862,7 +956,7 @@
     const contentEl = el.querySelector('.card-content');
 
     if (document.activeElement !== titleEl) titleEl.textContent = data.title || '';
-    if (document.activeElement !== contentEl) contentEl.textContent = data.content || '';
+    if (document.activeElement !== contentEl) contentEl.innerHTML = textToHtml(data.content || '');
 
     if (draggingCardId !== id) {
       el.style.left = (data.x || 0) + 'px';
@@ -874,6 +968,7 @@
     el.querySelector('.collapse-btn').textContent = isCollapsed ? '▸' : '▾';
 
     applyCardColor(el, data.color || null);
+    if (el._refreshImage) el._refreshImage(data.imageUrl || null);
   }
 
   // ================================================================
